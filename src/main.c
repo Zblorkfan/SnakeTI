@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/rtc.h>
+#include <fileioc.h>
 
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
@@ -61,7 +62,7 @@ void generateFood(Food* food, Snake* snake) {
     food->active = true;
 }
 
-bool checkCollision(Snake* snake, Food* food) {
+bool checkCollision(Snake* snake, Food* food, int* score) {
     for (int i = 1; i < snake->length; i++) {
         if (snake->body[i].x == snake->body[0].x && snake->body[i].y == snake->body[0].y) {
             return true;  // Collision with snake's body
@@ -73,6 +74,7 @@ bool checkCollision(Snake* snake, Food* food) {
     if (snake->body[0].x == food->x && snake->body[0].y == food->y) {
         food->active = false;  // Collision with food
         snake->length++;
+        (*score)++;
     }
     return false;
 }
@@ -84,20 +86,22 @@ void drawFood(Food* food) {
     }
 }
 
-void drawGameOverScreen() {
+void drawGameOverScreen(int score) {
     gfx_ZeroScreen();
     gfx_SetTextScale(2, 2);
     gfx_FillScreen(gfx_white);
     gfx_SetTextFGColor(gfx_black);
 
+    char scoreStr[6] = "0\0\0\0\0\0";
+    real_t scored = os_FloatToReal(score);
+    os_RealToStr(scoreStr, &scored, 6, 1, 0);
 
-
-    gfx_PrintStringXY("Game Over", (SCREEN_WIDTH - gfx_GetStringWidth("Game Over")) / 2, SCREEN_HEIGHT / 2 - 16);
-    gfx_PrintStringXY("Play Again: [2nd]", (SCREEN_WIDTH - gfx_GetStringWidth("Play Again: [2nd]")) / 2, SCREEN_HEIGHT / 2 + 16);
-    gfx_PrintStringXY("Quit: [annul]", (SCREEN_WIDTH - gfx_GetStringWidth("Quit: [annul]")) / 2, SCREEN_HEIGHT / 2 + 48);
+    gfx_PrintStringXY("Game Over", (SCREEN_WIDTH - gfx_GetStringWidth("Game Over")) / 2, SCREEN_HEIGHT / 2 - 56);
+    gfx_PrintStringXY("Score: ", (SCREEN_WIDTH - gfx_GetStringWidth("Score: ")) / 2, SCREEN_HEIGHT / 2 + 16);
+    gfx_PrintStringXY(scoreStr, (SCREEN_WIDTH - gfx_GetStringWidth(scoreStr)) / 2, SCREEN_HEIGHT / 2 + 48);
+    gfx_PrintStringXY("Play Again: [2nd]", (SCREEN_WIDTH - gfx_GetStringWidth("Play Again: [2nd]")) / 2, SCREEN_HEIGHT / 2 + 70);
+    gfx_PrintStringXY("Quit: [annul]", (SCREEN_WIDTH - gfx_GetStringWidth("Quit: [annul]")) / 2, SCREEN_HEIGHT / 2 + 90);
 }
-
-
 
 int main(void) {
     Snake snake;
@@ -119,8 +123,9 @@ int main(void) {
 
     srand(rtc_Time()); // Initialisation de la séquence de nombres aléatoires
 
-    int score = 0;
+
     bool gameOver = false;
+    int score = 0;
 
     while (!kb_IsDown(kb_KeyClear)) {
         gfx_ZeroScreen();
@@ -130,19 +135,19 @@ int main(void) {
                 generateFood(&food, &snake);
             }
 
-            if (kb_IsDown(kb_KeyLeft) && snake.dx != SNAKE_SIZE) {
+            if (kb_IsDown(kb_Left) && snake.dx != SNAKE_SIZE) {
                 snake.dx = -SNAKE_SIZE;
                 snake.dy = 0;
             }
-            if (kb_IsDown(kb_KeyRight) && snake.dx != -SNAKE_SIZE) {
+            if (kb_IsDown(kb_Right) && snake.dx != -SNAKE_SIZE) {
                 snake.dx = SNAKE_SIZE;
                 snake.dy = 0;
             }
-            if (kb_IsDown(kb_KeyUp) && snake.dy != SNAKE_SIZE) {
+            if (kb_IsDown(kb_Up) && snake.dy != SNAKE_SIZE) {
                 snake.dx = 0;
                 snake.dy = -SNAKE_SIZE;
             }
-            if (kb_IsDown(kb_KeyDown) && snake.dy != -SNAKE_SIZE) {
+            if (kb_IsDown(kb_Down) && snake.dy != -SNAKE_SIZE) {
                 snake.dx = 0;
                 snake.dy = SNAKE_SIZE;
             }
@@ -151,14 +156,12 @@ int main(void) {
             drawSnake(&snake);
             drawFood(&food);
 
-            if (checkCollision(&snake, &food)) {
+            if (checkCollision(&snake, &food, &score)) {
                 gameOver = true;
             }
-
         } else {
-            drawGameOverScreen();
-            if (kb_IsDown(kb_Key2nd)) {
-
+            drawGameOverScreen(score);
+            if (kb_IsDown(kb_2nd)) {
                 // Restart the game
                 snake.length = 3;
                 snake.body[0].x = SCREEN_WIDTH / 2;
@@ -173,18 +176,16 @@ int main(void) {
                 food.active = false;
                 score = 0;
                 gameOver = false;
-            } else if (kb_IsDown(kb_KeyClear)) {
-                // Quit the game
-                break;
             }
         }
 
         gfx_SwapDraw();
 
-        kb_Scan();
         delay(100);
     }
+
     gfx_End();
 
     return 0;
 }
+
